@@ -24,6 +24,13 @@ echo "repo_fqdn=\"${repo_name}\"" >> "${cfg}"
 echo "repo_webhook=\"${webhook_secret:-changeme}\"" >> "${cfg}"
 source ${cfg}
 
+if [[ ! -f "${repo_id}" ]]
+then
+    ssh-keygen -t ed25519 -C "${USER}@${repo_fqdn}" -N "" -f "${repo_id}"
+fi
+echo "Public key (deployment key for Github)"
+cat "${repo_id}.pub"
+
 echo " "
 echo "Följ instruktioner för att sätta upp en [Github webhook](https://docs.github.com/en/developers/webhooks-and-events/webhooks/creating-webhooks)."
 echo "Låt hemligheten vara ${repo_webhook} (samma som för din webhook)."
