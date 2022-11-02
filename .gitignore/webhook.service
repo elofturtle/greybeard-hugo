@@ -1,0 +1,12 @@
+[Unit]
+Description=Listens on port 9000 for webhooks defined in /opt/redeploy/hooks.json
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/webhook -urlprefix postreceive -hooks /opt/redeploy/hooks.json -verbose
+Type=simple
+User=caddy
+Group=caddy
+
+[Install]
+WantedBy=multi-user.target
