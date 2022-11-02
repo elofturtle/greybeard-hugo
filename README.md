@@ -7,3 +7,7 @@ Kör skripten från repo-rooten för säkerhets skull.
 * Kör sedan install.sh
 
 TODO: verifiera att allt funkar som det ska på tom maskin :)
+
+# Använda Hugo
+
+TODO: enkel guide och länkar
