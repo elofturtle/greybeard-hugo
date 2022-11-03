@@ -1,6 +1,15 @@
-#!/bin/bash
-read -p "Clone url: " git_url 
-read -p "webhook secret" webhook_secret
+#!/usr/bin/env bash
+git_url="$1"
+webhook_secret="$2"
+
+if [[ -z "$git_url" ]]
+then
+	read -p "Clone url: " git_url 
+fi
+if [[ -z "$webhook_secret" ]] 
+then
+	read -p "Webhook secret: " webhook_secret
+fi
 
 if [[ -z "${git_url}" ]]
 then
@@ -8,13 +17,11 @@ then
     exit 1
 fi
 
-sudo mkdir -p /opt/redeploy/.ssh
-sudo mkdir -p /opt/redeploy/webhook.d
-sudo mkdir -p /opt/redeploy/ceddy.d 
+sudo mkdir -p /opt/redeploy/{.ssh,webhook.d,caddy.d,repo.d}
+
 
 repo_name="$(basename ${git_url} .git)"
 cfg="/opt/redeploy/repo.d/${repo_name}.repo"
-sudo mkdir -p "$($dirname $cfg)"
 bas="$(dirname $0)"
 
 echo "Creating ${cfg}"
@@ -26,7 +33,7 @@ source ${cfg}
 
 if [[ ! -f "${repo_id}" ]]
 then
-    ssh-keygen -t ed25519 -C "${USER}@${repo_fqdn}" -N "" -f "${repo_id}"
+    ssh-keygen -t ed25519 -C "${sender}@${repo_fqdn}" -N "" -f "${repo_id}"
 fi
 echo "Public key (deployment key for Github)"
 cat "${repo_id}.pub"
@@ -54,21 +61,29 @@ echo "${repo_fqdn} {
 read -p "Initialize repo [y/n]? "
 if [[ $REPLY != "y" ]] && [[ $REPLY != "Y" ]]
 then
-    echo "Deploying"
-    "$(dirname $0)/redeploy.sh" --repo ${repo_name}
+	:
 else
     echo "Creating repository"
+    repo_path="/tmp/repos/${repo_name}"
     mkdir -p "${repo_path}"
+    cd "$(dirname ${repo_path})"
+    hugo new site "${repo_name}" -f yml # use yaml config
     cd "${repo_path}"
     git init
+    git config user.email ${sender:-admin}@${repo_fqdn}
+    git config user.username ${sender:-admin}
     echo '.hugo_build.lock' >> .gitignore
-    hugo new site "${repo_name}" -f yml # use yaml config
-    GIT_SSH_COMMAND="ssh -i $repo_id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no'" git -C "$repo_path/$repo_name" git submodule add --depth=1 https://github.com/adityatelange/hugo-PaperMod.git themes/PaperMod
+    
+    GIT_SSH_COMMAND="ssh -i $repo_id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no'" git -C "$repo_path" submodule add --depth=1 https://github.com/adityatelange/hugo-PaperMod.git themes/PaperMod
     echo 'tag = v6.0' >> .gitmodules
-    GIT_SSH_COMMAND="ssh -i $repo_id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no'" git -C "$repo_path/$repo_name" git submodule update --init --recursive # needed when you reclone your repo (submodules may not get cloned automatically)
+    GIT_SSH_COMMAND="ssh -i $repo_id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no'" git -C "$repo_path"  submodule update --init --recursive # needed when you reclone your repo (submodules may not get cloned automatically)
     git add --all
     git commit -m "initial commit"
-    git remote set-url origin ${repo_url}
-    GIT_SSH_COMMAND="ssh -i $repo_id -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no'" git -C "$repo_path/$repo_name" git push origin
+    git remote add origin ${repo_url}
+    read -p "Push (you must have configured a push key yourself)? "
+    if [[ "$REPLY" == "y" ]] || [[ "$REPLY" == "Y" ]]
+    then
+    	GIT_SSH_COMMAND="ssh -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no'" git -C "$repo_path"  push origin
+    fi
 fi
 echo "Done"
