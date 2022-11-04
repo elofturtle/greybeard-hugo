@@ -1,4 +1,20 @@
 #!/bin/bash
+
+function centos_install_git {
+	sudo dnf -y install git
+}
+
+# Extend this and create corresponding distro-lib.sh file, implementing the functions defined in centos-lib.sh to create support for other distros.
+release=$(cat /etc/os-release | grep ^ID= | cut -d '=' -f2 | tr -d '"')
+case "$release" in 
+	centos*|fedora*|rhel*) source $(dirname $0)/centos-lib.sh
+		;;
+	ubuntu*|debian*) source $(dirname $0)/ubuntu-lib.sh
+		;;
+	*) echo "ERR Can't guess ditro!" && exit 1
+		;;
+esac
+
 read -p "Done running add-repo.sh? [y/n]"
 if [[ "$REPLY" != "y" ]] || [[ "$REPLY" != "Y" ]]
 then
@@ -7,12 +23,10 @@ then
 fi
 
 echo "Installing git"
-sudo dnf -y install git
+install_git
 
 echo "Installing Caddy"
-sudo dnf -y install 'dnf-command(copr)'
-sudo dnf copr enable @caddy/caddy
-sudo dnf -y install caddy # /etc/caddy/Caddyfile
+install_caddy # /etc/caddy/Caddyfile
 sudo systemctl enable caddy
 sudo $(dirname $0)/create_caddyfile.sh
 
