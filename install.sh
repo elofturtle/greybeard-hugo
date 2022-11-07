@@ -1,45 +1,85 @@
 #!/bin/bash
-read -p "Done running add-repo.sh? [y/n]"
-if [[ "$REPLY" != "y" ]] || [[ "$REPLY" != "Y" ]]
+if [[ "$(whoami)" != "root" ]]
 then
-    echo "exiting prematurely"
-    exit 1
+	echo "Please execute as root"
+	exit 0
 fi
 
-echo "Installing git"
-sudo dnf -y install git
+echo "Registered repos:"
+find /opt/redeploy/repo.d/ -type f -name '*.repo' -print
+read -p "Done running add-repo.sh? [y/n]"
+while [[ "$REPLY" != "y" ]] && [[ "$REPLY" != "Y" ]]
+do
+	echo "Adding repo..."
+    	$(dirname $0)/add-repo.sh
+    	echo" "
+    	echo "Repos:"
+    	find /opt/redeploy/repo.d/ -type f -name '*.repo' -print
+    	read -p "Done running add-repo.sh? [y/n]"
+done
 
-echo "Installing Caddy"
-sudo dnf -y install 'dnf-command(copr)'
-sudo dnf copr enable @caddy/caddy
-sudo dnf -y install caddy # /etc/caddy/Caddyfile
-sudo systemctl enable caddy
-sudo $(dirname $0)/create_caddyfile.sh
+if [[ ! -f "/usr/bin/git" ]]
+then
+	echo "Installing git"
+	dnf -y install git
+else
+	echo "Skipping git install"
+fi
 
-sudo mkdir -p /var/www/
-sudo chown -R caddy:root /var/www/ 
+if [[ ! -f "/usr/bin/caddy" ]]
+then
+	echo "Installing Caddy"
+	dnf -y install 'dnf-command(copr)'
+	dnf -y copr enable @caddy/caddy
+	dnf -y install caddy # /etc/caddy/Caddyfile
+	systemctl enable caddy
+else
+	echo "Skipping caddy install"
+fi
+echo "Generating caddyfile"
+$(dirname $0)/create_caddyfile.sh
+
+echo "Updating permissions"
+mkdir -p /var/www/
+chown -R caddy:root /var/www/ 
+chown -R caddy:root /tmp/repos/
 
 
-echo "Install webhook"
-wget https://github.com/adnanh/webhook/releases/latest/download/webhook-linux-amd64.tar.gz -O /tmp/webhook.tar.gz
-sudo tar -C /usr/bin/ -xvf /tmp/webhook.tar.gz --strip-components=1
-sudo chmod +x /usr/bin/webhook
-sudo mkdir -p /opt/redeploy/.ssh
-sudo mkdir -p /opt/redeploy/webhook.d
-sudo restorecon -R -v  /usr/bin/ # fix selinux permission for webhhok binary
-sudo cp webhook.service /opt/redeploy/
-sudo systemctl enable /opt/redeploy/webhook.service
-sudo $(dirname $0)/create_webhook.sh
+if [[ ! -f "/usr/bin/webhook" ]]
+then
+	echo "Install webhook"
+	wget https://github.com/adnanh/webhook/releases/latest/download/webhook-linux-amd64.tar.gz -O /tmp/webhook.tar.gz
+	tar -C /usr/bin/ -xvf /tmp/webhook.tar.gz --strip-components=1
+	chmod +x /usr/bin/webhook
+else
+	echo "Skipping webhook install"
+fi
+echo "Updating permissions"
+mkdir -p /opt/redeploy/.ssh
+mkdir -p /opt/redeploy/webhook.d
+restorecon -R -v  /usr/bin/ # fix selinux permission for webhook binary
+cp webhook.service /opt/redeploy/
+systemctl enable /opt/redeploy/webhook.service
 
-echo "Install hugo"
-wget https://github.com/gohugoio/hugo/releases/download/v${hugo_version:-0.105.0}/hugo_${hugo_version:-0.105.0}_Linux-64bit.tar.gz -O /tmp/hugo.tar.gz
-sudo tar -C /usr/bin/ -xvf /tmp/hugo.tar.gz hugo
-sudo chmod +x /usr/bin/hugo
+echo "Creating webhook config"
+$(dirname $0)/create_webhook.sh
 
-echo "Install redeploy.sh"
-sudo cp redeploy.sh /opt/redeploy/redeploy.sh 
-sudo chmod +x /opt/redeploy/redeploy.sh
-sudo echo '
+if [[ ! -f "/usr/bin/hugo" ]]
+then
+	echo "Install hugo"
+	wget https://github.com/gohugoio/hugo/releases/download/v${hugo_version:-0.105.0}/hugo_${hugo_version:-0.105.0}_Linux-64bit.tar.gz -O /tmp/hugo.tar.gz
+	tar -C /usr/bin/ -xvf /tmp/hugo.tar.gz hugo
+	chmod +x /usr/bin/hugo
+else
+	echo "Skipping hugo install"
+fi
+
+if [[ ! -f "/opt/redeploy/redeploy.sh" ]]
+then
+	echo "Install redeploy.sh"
+	cp redeploy.sh /opt/redeploy/redeploy.sh 
+	chmod +x /opt/redeploy/redeploy.sh
+	echo '
 # explicitly define binaries because systemd
 caddy_bin="/usr/bin/caddy"
 caddy_user="caddy"
@@ -48,10 +88,14 @@ webhook_bin="/usr/bin/webhook"
 www_target="/var/www"   # generated sites here
 repo_base="/tmp/repos"  # clone repos here
 ' > /opt/redeploy/redeploy.conf
-
-sudo systemctl start caddy
-sudo systemctl status caddy
-sudo systemctl start webhook
-sudo systemctl status webhook
+	restorecon -R -v /opt/redeploy
+else
+	echo "Skipping redeploy.sh install"
+fi
+echo "Restarting services (caddy, webhook)"
+systemctl restart caddy
+systemctl status caddy --no-pager
+systemctl restart webhook
+systemctl status webhook --no-pager
 
 echo "Done"

@@ -8,7 +8,9 @@ echo '[
 for i in $(find ${cfgdir} -type f -name '*.json')
 do
     cat "$i" >> "${cfg}"
-    echo "," >> "${cfg}"
+    echo ",
+    
+    " >> "${cfg}"
 done
 echo '
 ]' >> "${cfg}"

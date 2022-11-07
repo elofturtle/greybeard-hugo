@@ -22,7 +22,7 @@ sudo mkdir -p /opt/redeploy/{.ssh,webhook.d,caddy.d,repo.d}
 
 repo_name="$(basename ${git_url} .git)"
 cfg="/opt/redeploy/repo.d/${repo_name}.repo"
-bas="$(dirname $0)"
+bas="$(dirname $(readlink -f $0))"
 
 echo "Creating ${cfg}"
 echo "repo_url=\"${git_url}\"" > "${cfg}" 
@@ -49,7 +49,7 @@ cp "$bas/webhook.json.orig" "${cfg}"
 sed -i "s/REPO_NAME/${repo_name}/g" "${cfg}"
 sed -i "s/changeme/${webhook_secret}/g" "${cfg}"
 
-cfg="/opt/redeploy/webhook.d/${repo_name}.json"
+cfg="/opt/redeploy/caddy.d/${repo_name}.caddyfile"
 repo_path="/var/www/$(tr '.' $'\n' <<< "$repo_fqdn" | tac | paste -s -d '/')"
 echo "Creating ${cfg}"
 echo "${repo_fqdn} {
@@ -83,7 +83,7 @@ else
     read -p "Push (you must have configured a push key yourself)? "
     if [[ "$REPLY" == "y" ]] || [[ "$REPLY" == "Y" ]]
     then
-    	GIT_SSH_COMMAND="ssh -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no'" git -C "$repo_path"  push origin
+	    GIT_SSH_COMMAND="ssh -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no'" git -C "$repo_path"  push origin master $(git -C "$repo_path" git rev-parse --abbrev-ref HEAD)
     fi
 fi
 echo "Done"

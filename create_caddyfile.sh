@@ -1,7 +1,13 @@
 #!/bin/bash
-sudo echo ' ' > /etc/caddy/Caddyfile
-for i in $(find /opt/redeploy/webhook.d -type f -name '*.json')
+if [[ "$(whoami)" != "root" ]]
+then
+	echo "Please execute as root" 
+	exit 1
+fi
+
+echo ' ' > /etc/caddy/Caddyfile
+for i in $(find /opt/redeploy/caddy.d -type f -name '*.caddyfile' -printf "%p ")
 do
-    sudo cat "$i
-    " >> /etc/caddy/Caddyfile 
+	cat "$i" >> /etc/caddy/Caddyfile
+   	echo " " >> /etc/caddy/Caddyfile  
 done
