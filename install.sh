@@ -1,4 +1,19 @@
 #!/bin/bash
+function centos_install_git {
+	dnf -y install git
+}
+
+# Extend this and create corresponding distro-lib.sh file, implementing the functions defined in centos-lib.sh to create support for other distros.
+release=$(cat /etc/os-release | grep ^ID= | cut -d '=' -f2 | tr -d '"')
+case "$release" in 
+	centos*|fedora*|rhel*) source $(dirname $0)/centos-lib.sh
+		;;
+	ubuntu*|debian*) source $(dirname $0)/ubuntu-lib.sh
+		;;
+	*) echo "ERR Can't guess ditro!" && exit 1
+		;;
+esac
+
 if [[ "$(whoami)" != "root" ]]
 then
 	echo "Please execute as root"
@@ -7,6 +22,7 @@ fi
 
 echo "Registered repos:"
 find /opt/redeploy/repo.d/ -type f -name '*.repo' -print
+
 read -p "Done running add-repo.sh? [y/n]"
 while [[ "$REPLY" != "y" ]] && [[ "$REPLY" != "Y" ]]
 do
@@ -43,7 +59,6 @@ echo "Updating permissions"
 mkdir -p /var/www/
 chown -R caddy:root /var/www/ 
 chown -R caddy:root /tmp/repos/
-
 
 if [[ ! -f "/usr/bin/webhook" ]]
 then
@@ -97,5 +112,4 @@ systemctl restart caddy
 systemctl status caddy --no-pager
 systemctl restart webhook
 systemctl status webhook --no-pager
-
 echo "Done"
