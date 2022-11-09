@@ -1,24 +1,11 @@
 #!/bin/bash
-function centos_install_git {
-	dnf -y install git
+
+source "$(dirname $0)/common-lib.sh" || {
+	echo "ERR Couldn't source common lib!";
+	exit 1;
 }
 
-# Extend this and create corresponding distro-lib.sh file, implementing the functions defined in centos-lib.sh to create support for other distros.
-release=$(cat /etc/os-release | grep ^ID= | cut -d '=' -f2 | tr -d '"')
-case "$release" in 
-	centos*|fedora*|rhel*) source $(dirname $0)/centos-lib.sh
-		;;
-	ubuntu*|debian*) source $(dirname $0)/ubuntu-lib.sh
-		;;
-	*) echo "ERR Can't guess ditro!" && exit 1
-		;;
-esac
-
-if [[ "$(whoami)" != "root" ]]
-then
-	echo "Please execute as root"
-	exit 0
-fi
+rootcheck
 
 echo "Registered repos:"
 find /opt/redeploy/repo.d/ -type f -name '*.repo' -print
@@ -30,86 +17,46 @@ do
     	$(dirname $0)/add-repo.sh
     	echo" "
     	echo "Repos:"
-    	find /opt/redeploy/repo.d/ -type f -name '*.repo' -print
+    	find "${bas}/repo.d/" -type f -name '*.repo' -print
     	read -p "Done running add-repo.sh? [y/n]"
 done
 
-if [[ ! -f "/usr/bin/git" ]]
-then
-	echo "Installing git"
-	dnf -y install git
-else
-	echo "Skipping git install"
-fi
+##################
+# Install things #
+##################
+install_git
+install_caddy
+install_webhook
+install_hugo 0.105.0
+install_redeploy
 
-if [[ ! -f "/usr/bin/caddy" ]]
-then
-	echo "Installing Caddy"
-	dnf -y install 'dnf-command(copr)'
-	dnf -y copr enable @caddy/caddy
-	dnf -y install caddy # /etc/caddy/Caddyfile
-	systemctl enable caddy
-else
-	echo "Skipping caddy install"
-fi
+################################
+# Set permissions after install#
+################################
+echo "Updating permissions"
+update_permissions
+
 echo "Generating caddyfile"
 $(dirname $0)/create_caddyfile.sh
-
-echo "Updating permissions"
-mkdir -p /var/www/
-chown -R caddy:root /var/www/ 
-chown -R caddy:root /tmp/repos/
-
-if [[ ! -f "/usr/bin/webhook" ]]
-then
-	echo "Install webhook"
-	wget https://github.com/adnanh/webhook/releases/latest/download/webhook-linux-amd64.tar.gz -O /tmp/webhook.tar.gz
-	tar -C /usr/bin/ -xvf /tmp/webhook.tar.gz --strip-components=1
-	chmod +x /usr/bin/webhook
-else
-	echo "Skipping webhook install"
-fi
-echo "Updating permissions"
-mkdir -p /opt/redeploy/.ssh
-mkdir -p /opt/redeploy/webhook.d
-restorecon -R -v  /usr/bin/ # fix selinux permission for webhook binary
-cp webhook.service /opt/redeploy/
-systemctl enable /opt/redeploy/webhook.service
 
 echo "Creating webhook config"
 $(dirname $0)/create_webhook.sh
 
-if [[ ! -f "/usr/bin/hugo" ]]
-then
-	echo "Install hugo"
-	wget https://github.com/gohugoio/hugo/releases/download/v${hugo_version:-0.105.0}/hugo_${hugo_version:-0.105.0}_Linux-64bit.tar.gz -O /tmp/hugo.tar.gz
-	tar -C /usr/bin/ -xvf /tmp/hugo.tar.gz hugo
-	chmod +x /usr/bin/hugo
-else
-	echo "Skipping hugo install"
-fi
+echo "Creating redeploy config"
+update_redeploy_config
 
-if [[ ! -f "/opt/redeploy/redeploy.sh" ]]
-then
-	echo "Install redeploy.sh"
-	cp redeploy.sh /opt/redeploy/redeploy.sh 
-	chmod +x /opt/redeploy/redeploy.sh
-	echo '
-# explicitly define binaries because systemd
-caddy_bin="/usr/bin/caddy"
-caddy_user="caddy"
-git_bin="/usr/bin/git"
-webhook_bin="/usr/bin/webhook"
-www_target="/var/www"   # generated sites here
-repo_base="/tmp/repos"  # clone repos here
-' > /opt/redeploy/redeploy.conf
-	restorecon -R -v /opt/redeploy
-else
-	echo "Skipping redeploy.sh install"
-fi
+################
+# SystemD stuff#
+################
+restorecon -R -v "${bas}"
+restorecon -R -v  "${bin_dir}/" # fix selinux permission for webhook binary
+
 echo "Restarting services (caddy, webhook)"
+systemctl enable "${bas}/webhook.service"
+systemctl enable caddy
 systemctl restart caddy
 systemctl status caddy --no-pager
 systemctl restart webhook
 systemctl status webhook --no-pager
+
 echo "Done"
