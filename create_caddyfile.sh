@@ -1,13 +1,18 @@
 #!/bin/bash
-if [[ "$(whoami)" != "root" ]]
-then
-	echo "Please execute as root" 
-	exit 1
-fi
+source "$(dirname $0)/common-lib.sh" || {
+	echo "ERR failed source common libs!";
+	exit 1;
+}
 
-echo ' ' > /etc/caddy/Caddyfile
-for i in $(find /opt/redeploy/caddy.d -type f -name '*.caddyfile' -printf "%p ")
+rootcheck
+
+cfg="/etc/caddy/Caddyfile"
+
+echo ' ' > "$cfg"
+for i in $(find "$bas/repo.d" -type f -name '*.repo' -printf "%p ")
 do
-	cat "$i" >> /etc/caddy/Caddyfile
-   	echo " " >> /etc/caddy/Caddyfile  
+	get_site_config "$i" >> "$cfg"
+   	echo " " >> "$cfg"  
 done
+
+sudo systemctl restart caddy
