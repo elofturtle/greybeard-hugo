@@ -11,3 +11,5 @@ TODO: verifiera att allt funkar som det ska på tom maskin :)
 # Använda Hugo
 
 TODO: enkel guide och länkar
+TODO: extend repo conf to support more templates for webhooks
+TODO: use install instead of cp to set modes immediately
