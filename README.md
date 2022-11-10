@@ -13,3 +13,4 @@ TODO: verifiera att allt funkar som det ska på tom maskin :)
 TODO: enkel guide och länkar
 TODO: extend repo conf to support more templates for webhooks
 TODO: use install instead of cp to set modes immediately
+TODO: integrate uninstall.sh, create*, add-repo.sh to common libs and move into install.sh. rename to just install and redeploy and fix vim lang
