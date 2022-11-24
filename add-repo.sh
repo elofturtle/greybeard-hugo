@@ -41,6 +41,8 @@ cat "${repo_id}.pub"
 echo " "
 echo "Följ instruktioner för att sätta upp en [Github webhook](https://docs.github.com/en/developers/webhooks-and-events/webhooks/creating-webhooks)."
 echo "Låt hemligheten vara ${repo_webhook} (samma som för din webhook)."
+echo "Typ application/json"
+echo "Webhook url http://<domain>:<port>/postreceive/redeploy"
 echo " "
 
 cfg="/opt/redeploy/webhook.d/${repo_name}.json"
@@ -52,11 +54,17 @@ sed -i "s/changeme/${webhook_secret}/g" "${cfg}"
 cfg="/opt/redeploy/caddy.d/${repo_name}.caddyfile"
 repo_path="/var/www/$(tr '.' $'\n' <<< "$repo_fqdn" | tac | paste -s -d '/')"
 echo "Creating ${cfg}"
-echo "${repo_fqdn} {
+echo "${repo_fqdn}:443 {
         root * ${repo_path}
         file_server
         tls ${sender:-admin}@${repo_fqdn}
-}" > "${cfg}"
+}
+
+${repo_fqdn}:80 {
+        redir https://${repo_fqdn} 302
+        tls ${sender:-admin}@${repo_fqdn}
+}
+" > "${cfg}"
 
 read -p "Initialize repo [y/n]? "
 if [[ $REPLY != "y" ]] && [[ $REPLY != "Y" ]]

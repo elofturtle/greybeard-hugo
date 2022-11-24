@@ -1,9 +1,10 @@
 #!/bin/bash 
-if [[ "$(whoami)" != "root" ]]
-then
-	echo "Please execute as root"
-	exit 1
-fi
+source "$(dirname $0)/common-lib.sh" || {
+        echo "ERR Couldn't source common lib!";
+        exit 1;
+}
+
+rootcheck
 
 read -p "Complete removal[y/n]? "
 if [[ "$REPLY" == y ]] || [[ "$REPLY" == "Y" ]]

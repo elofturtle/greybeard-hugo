@@ -4,26 +4,12 @@ bas="$(dirname $0)"
 konf="${bas}/$(basename $0 .sh).conf"
 clean_repo="false"
 
-function verify_init {
-        if [[ -z "$1" ]]
-        then
-                echo "$2"
-                exit "$3"
-        fi
-        return 0 
+source "$(dirname $0)/common-lib.sh" || {
+        echo "ERR Couldn't source common lib!";
+        exit 1;
 }
 
-function update_path {
-        verify_init "$1" "$2" "$3"
-        if [[ ! -f "$1" ]]
-        then
-                echo "$1 defined but not found!"
-                exit "$3"
-        else
-                export PATH="$(dirname $1):$PATH"
-        fi
-        return 0
-}
+rootcheck
 
 while (($#))
 do
@@ -32,6 +18,13 @@ do
                         shift
                         konf="$(readlink -f $1)"
                         ;;
+		'--all')
+			for r in $($0 --repo-list)
+			do
+				$0 --clean --repo $r
+			done
+			exit 0
+			;;
                 '--clean')
                         clean_repo="true"
                         ;;
@@ -45,6 +38,7 @@ do
                         ;;
                 '--help'|*)
                         echo "$(basename $0):"
+			echo "  --all           reinit all repos"
                         echo "  --clean         delete repo and clone again"
                         echo "  --repo          which repo config to use?"
                         echo "  --config        config file to use"
@@ -79,7 +73,6 @@ source "${bas}/repo.d/${repo}.repo" || {
 }
 
 verify_init "$repo_base" "repo_base not defined" "15"
-
 verify_init "$repo_url" "repo_url (git clone uri) not defined" "17"
 verify_init "$repo_id" "repo_id (ssh key path) not defined" "18"
 verify_init "$repo_fqdn" "repo_fqdn not defined" "19"

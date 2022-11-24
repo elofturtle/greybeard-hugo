@@ -85,14 +85,35 @@ function update_permissions {
 }
 
 function update_redeploy_config {
-	echo '# explicitly define binaries because systemd
+	echo "# explicitly define binaries because systemd
 caddy_bin="$(type -p caddy)"
 caddy_user="${caddy_user}"
 git_bin="$(type -p git)"
 webhook_bin="$(type -p webhook)"
 www_target="${www_target}"   # generated sites here
 repo_base="${repo_base}"  # clone repos here
-' > "${bas}/redeploy.conf"
+" > "${bas}/redeploy.conf"
+}
+
+function verify_init {
+        if [[ -z "$1" ]]
+        then
+                echo "$2"
+                exit "$3"
+        fi
+        return 0
+}
+
+function update_path {
+        verify_init "$1" "$2" "$3"
+        if [[ ! -f "$1" ]]
+        then
+                echo "$1 defined but not found!"
+                exit "$3"
+        else
+                export PATH="$(dirname $1):$PATH"
+        fi
+        return 0
 }
 
 # Always end with this - do we want to define distro specific functions?
