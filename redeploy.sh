@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
 # webhook -urlprefix postreceive  -hooks hooks.json -verbose
-bas="$(dirname $0)"
-konf="${bas}/$(basename $0 .sh).conf"
+
+#!/usr/bin/env bash
+bas="$(dirname $(readlink -f $0))"
+source "${bas}/redeploy.conf"
 clean_repo="false"
-
-source "$(dirname $0)/common-lib.sh" || {
-        echo "ERR Couldn't source common lib!";
-        exit 1;
-}
-
-rootcheck
 
 while (($#))
 do
@@ -33,12 +28,12 @@ do
                         repo="$1"
                         ;;
                 '--repo-list')
-                        find "$bas/repo.d" -type f -name '*.repo' -exec basename {} .repo \;
+                        find "$repo_dir" -type f -name '*.repo' -exec basename {} .repo \;
                         exit 0
                         ;;
                 '--help'|*)
                         echo "$(basename $0):"
-			echo "  --all           reinit all repos"
+			            echo "  --all           reinit all repos"
                         echo "  --clean         delete repo and clone again"
                         echo "  --repo          which repo config to use?"
                         echo "  --config        config file to use"
@@ -51,37 +46,10 @@ do
         shift
 done
 
-verify_init "$bas" "bas not defined" "1"
-verify_init "$clean_repo" "clean_repo not set" "5"
-verify_init "$konf" "konf not defined" "2"
-source "${konf}" || {
-        echo "${konf} not found or unreadable";
-        exit "3";
-}
-
-update_path "$caddy_bin" "caddy_bin not defined" "10"
-update_path "$git_bin" "git_bin not defined" "12"
-update_path "$webhook_bin" "webhook_bin not defined" "13"
-
-verify_init "$caddy_user" "caddy_user not defined" "11"
-verify_init "$www_target" "www_target not defined" "14"
-
-verify_init "$repo" "Repo not defined" "4"
-source "${bas}/repo.d/${repo}.repo" || {
-        echo "${bas}/repo.d/${repo}.repo not found or unreadable";
-        exit 6;
-}
-
-verify_init "$repo_base" "repo_base not defined" "15"
-verify_init "$repo_url" "repo_url (git clone uri) not defined" "17"
-verify_init "$repo_id" "repo_id (ssh key path) not defined" "18"
-verify_init "$repo_fqdn" "repo_fqdn not defined" "19"
-
-repo_path="$repo_base/$(tr '.' $'\n' <<< "$repo_fqdn" | tac | paste -s -d '/')" # /tmp/repos/eu/feks
-repo_name="$(basename $repo_path)"                                              # feks
-repo_path="$(dirname $repo_path)"                                               # /tmp/repos/eu
-
-# Every variable seems set, let's go!
+repo_path="$repo_base/$(tr '.' $'\n' <<< "$repo" | tac | paste -s -d '/')/${repo}"  # /tmp/repos/eu/feks/feks.eu
+repo_name="$(basename $repo_path)"                                                  # feks.eu
+repo_path="$(dirname $repo_path)"                                                   # /tmp/repos/eu/feks
+repo_id="${ssh_key_dir}/${repo_name}_id"
 
 if [[ ! -d "$repo_path/$repo_name/.git" ]] || [[ "$clean_repo" == "true" ]]  # not exist or not git repo
 then
@@ -105,4 +73,4 @@ else
 
 fi
 
-hugo --config "${repo_path}/${repo_name}/config.toml" --source "${repo_path}/${repo_name}" --log --logFile "$repo_base/hugo.log" --verbose --verboseLog --cleanDestinationDir --destination "${repo_path/$repo_base/$www_target}/${repo_name}"
+hugo --config "${repo_path}/${repo_name}/config.toml" --source "${repo_path}/${repo_name}" --log --logFile "$repo_base/hugo.log" --verbose --verboseLog --cleanDestinationDir --destination "${repo_path}/${repo_name}"

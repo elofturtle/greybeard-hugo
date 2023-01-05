@@ -1,24 +1,62 @@
-#!/bin/bash
-bas="/opt/redeploy/"
+#!/usr/bin/env bash
+bas="$(dirname $(readlink -f $0))"
+source "${bas}/redeploy.conf" # webhook_secret, etc
 cfg="${bas}/hooks.json"
-cfgdir="${bas}/webhook.d"
-
 echo '[
     ' > "${cfg}.tmp"
-for i in $(find ${cfgdir} -type f -name '*.json')
-do
-    cat "$i" >> "${cfg}.tmp"
-    echo ",
-    
-    " >> "${cfg}.tmp"
-done
-echo '
+echo '{
+    "id": "github",
+    "execute-command": "changeme_base/redeploy.sh",
+    "include-command-output-in-response": true,
+    "include-command-output-in-response-on-error": true,
+    "incoming-payload-content-type": "application/json",
+    "success-http-response-code": 200,
+    "response-message": "yay!",
+    "command-working-directory": "changeme_base",
+    "pass-arguments-to-command": [
+        {
+         "source": "string",
+         "name": "--repo"
+        },
+      {
+        "source": "payload",
+        "name": "repository.name"
+      }
+    ],
+    "trigger-rule": {
+      "and": [
+        {
+          "match":
+          {
+            "type": "payload-hmac-sha1",
+            "secret": "changeme_secret",
+            "parameter":
+            {
+              "source": "header",
+              "name": "X-Hub-Signature"
+            }
+          }
+        },
+        {
+          "match":
+          {
+            "type": "value",
+            "value": "refs/heads/master",
+            "parameter":
+            {
+              "source": "payload",
+              "name": "ref"
+            }
+          }
+        }
+      ]
+    }
+  }
+' > "${cfg}.tmp"
 ]' >> "${cfg}.tmp"
-
+sed -i "s/changeme_secret/${webhook_secret}/g" "${cfg}.tmp"
+sed -i "s/changeme_base/${bas}/g" "${cfg}.tmp"
 awk NF "${cfg}.tmp" > "${cfg}" # remove empty and whitespace lines
 rm "${cfg}.tmp"
-second_to_last_line=$(( $(wc -l "${cfg}" | cut -d' ' -f1) - 1 )) # should be my trailing comma
-sed -i "${second_to_last_line}d" "${cfg}"
-
 type -p jq &>/dev/null && cat "${cfg}" | jq
 echo "Done"
